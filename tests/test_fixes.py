@@ -9,8 +9,7 @@ import unittest
 from pathlib import Path
 
 from src.model.item_store import ItemStore
-from src.model.items import (PromoteItem, PromoteType, ServerConfig, SQLCompareItem,
-                                       SQLType, TodoItem)
+from src.model.items import PromoteItem, PromoteType, ServerConfig, SQLCompareItem, TodoItem
 from src.model.storage import MemorySecrets, Storage
 from src.services.sql_compare import compare
 
@@ -52,8 +51,7 @@ class UndoVisibilityTests(unittest.TestCase):
 
 # ----------------------------------------------------------------- bug #2
 def _item(servers):
-    return SQLCompareItem("test", "usp_x", SQLType.MYSQL,
-                          [ServerConfig(name, "h", databases=dbs) for name, dbs in servers])
+    return SQLCompareItem("test", "usp_x", [ServerConfig(name, "h", databases=dbs) for name, dbs in servers])
 
 
 class SqlCompareTests(unittest.TestCase):
@@ -61,7 +59,7 @@ class SqlCompareTests(unittest.TestCase):
         defs = {("prod", "db1"): "SELECT 1", ("prod", "db2"): "SELECT 1",
                 ("test", "db1"): "SELECT 2"}
         report = compare(_item([("prod", ["db1", "db2"]), ("test", ["db1"])]),
-                         fetch=lambda t, s, d, p: defs[(s.tab_name, d)])
+                         fetch=lambda s, d, p: defs[(s.tab_name, d)])
         self.assertFalse(report.all_match)   # the Java version reported "All definitions match"
         self.assertEqual(len(report.groups), 2)
         self.assertEqual([str(l) for l in report.groups[1]], ["test / db1"])
@@ -69,11 +67,11 @@ class SqlCompareTests(unittest.TestCase):
     def test_ignores_whitespace_and_case(self):
         defs = {"a": "SELECT  1\n FROM t", "b": "select 1 from\tT"}
         report = compare(_item([("s1", ["a"]), ("s2", ["b"])]),
-                         fetch=lambda t, s, d, p: defs[d])
+                         fetch=lambda s, d, p: defs[d])
         self.assertTrue(report.all_match)
 
     def test_missing_and_errors_are_reported_not_fatal(self):
-        def fetch(t, s, d, p):
+        def fetch(s, d, p):
             if d == "gone":
                 return None
             if d == "down":
@@ -106,13 +104,21 @@ class StorageTests(unittest.TestCase):
 
     def test_passwords_go_to_secret_store_not_json(self):
         store = self.storage.load("sql_compare")
-        store.add(SQLCompareItem("x", "usp", SQLType.TRANSACT_SQL,
-                                 [ServerConfig("prod", "h", username="u", password="hunter2")]))
+        store.add(SQLCompareItem("x", "usp", [ServerConfig("prod", "h", username="u", password="hunter2")]))
         raw = Path(self.tmp.name, "sql_compare.json").read_text()
         self.assertNotIn("hunter2", raw)
         self.assertIn("hunter2", self.secrets.data.values())
         again = self.storage.load("sql_compare")
         self.assertEqual(again.active[0].servers[0].password, "hunter2")
+
+    def test_old_files_with_a_sql_type_still_load(self):
+        Path(self.tmp.name, "sql_compare.json").write_text(json.dumps({"version": 1, "history": [],
+            "active": [{"description": "x", "procedure_name": "usp", "sql_type": "MYSQL",
+                        "servers": [{"tab_name": "prod", "host": "h", "databases": ["db"]}],
+                        "id": "abc"}]}))
+        store = self.storage.load("sql_compare")
+        self.assertEqual(store.active[0].procedure_name, "usp")
+        self.assertFalse(Path(self.tmp.name, "sql_compare.json.bad").exists())
 
     def test_corrupt_file_is_set_aside(self):
         Path(self.tmp.name, "todo.json").write_text("{not json")

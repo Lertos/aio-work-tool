@@ -22,11 +22,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-from ..model.items import ServerConfig, SQLCompareItem, SQLType
+from ..model.items import ServerConfig, SQLCompareItem
 from .odbc import best_driver
 
-# fetch(sql_type, server, database, procedure) -> definition text, or None if not found
-Fetcher = Callable[[SQLType, ServerConfig, str, str], "str | None"]
+# fetch(server, database, procedure) -> definition text, or None if not found
+Fetcher = Callable[[ServerConfig, str, str], "str | None"]
 
 _WHITESPACE = re.compile(r"\s+")
 
@@ -84,7 +84,7 @@ def compare(item: SQLCompareItem, fetch: Fetcher | None = None) -> CompareReport
         for database in server.databases:
             loc = Location(server.tab_name, database)
             try:
-                definition = fetch(item.sql_type, server, database, item.procedure_name)
+                definition = fetch(server, database, item.procedure_name)
             except Exception as exc:  # driver errors vary by library
                 report.errors[loc] = str(exc).strip() or type(exc).__name__
                 continue
@@ -100,35 +100,7 @@ def compare(item: SQLCompareItem, fetch: Fetcher | None = None) -> CompareReport
 
 # ------------------------------------------------------------- real database access
 
-def fetch_definition(sql_type: SQLType, server: ServerConfig, database: str,
-                     procedure: str) -> str | None:
-    if sql_type is SQLType.MYSQL:
-        return _fetch_mysql(server, database, procedure)
-    if sql_type is SQLType.TRANSACT_SQL:
-        return _fetch_tsql(server, database, procedure)
-    raise ValueError(f"Unsupported SQL type: {sql_type}")
-
-
-def _fetch_mysql(server: ServerConfig, database: str, procedure: str) -> str | None:
-    import pymysql
-
-    conn = pymysql.connect(host=server.host, port=server.port if server.port > 0 else 3306,
-                           user=server.username, password=server.password,
-                           database=database, connect_timeout=10)
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT routine_definition FROM information_schema.routines "
-                "WHERE specific_name = %s AND routine_schema = %s",
-                (procedure, database),
-            )
-            row = cur.fetchone()
-    finally:
-        conn.close()
-    return row[0] if row and row[0] is not None else None
-
-
-def _fetch_tsql(server: ServerConfig, database: str, procedure: str) -> str | None:
+def fetch_definition(server: ServerConfig, database: str, procedure: str) -> str | None:
     import pyodbc
 
     host = f"{server.host},{server.port}" if server.port > 0 else server.host

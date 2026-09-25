@@ -24,11 +24,6 @@ class PromoteType(LabeledEnum):
     MOVE = "Move"
 
 
-class SQLType(LabeledEnum):
-    MYSQL = "MySQL"
-    TRANSACT_SQL = "Transact-SQL"
-
-
 def _new_id() -> str:
     return uuid.uuid4().hex
 
@@ -98,7 +93,6 @@ class ServerConfig:
 class SQLCompareItem:
     description: str
     procedure_name: str
-    sql_type: SQLType
     servers: list[ServerConfig] = field(default_factory=list)
     id: str = field(default_factory=_new_id)  # stable key for passwords in the OS keyring
 
@@ -128,7 +122,7 @@ class SavedQuery:
 
 # ---------------------------------------------------------------- (de)serialisation
 
-_ENUM_FIELDS = {"path_type": PathType, "promote_type": PromoteType, "sql_type": SQLType}
+_ENUM_FIELDS = {"path_type": PathType, "promote_type": PromoteType}
 
 
 def item_to_dict(item) -> dict:
@@ -150,5 +144,6 @@ def item_from_dict(cls, data: dict):
         if key in data:
             data[key] = enum_cls[data[key]]
     if cls is SQLCompareItem:
+        data.pop("sql_type", None)  # older files: the app used to support MySQL too
         data["servers"] = [ServerConfig(**s) for s in data.get("servers", [])]
     return cls(**data)

@@ -17,8 +17,8 @@ from PySide6.QtWidgets import (QCheckBox, QFormLayout, QHBoxLayout, QLineEdit, Q
                                QPushButton, QSpinBox, QTabWidget, QWidget)
 
 from ...config import SPACING
-from ...model.items import ServerConfig, SQLCompareItem, SQLType
-from ..widgets import hline, lines, radio_group, selected_member, text_box
+from ...model.items import ServerConfig, SQLCompareItem
+from ..widgets import hline, lines, text_box
 from .item_form_dialog import ItemFormDialog, ValidationError
 
 
@@ -34,7 +34,7 @@ class ServerForm(QWidget):
         self.port.setRange(-1, 65535)
         self.port.setSpecialValueText("Default")
         self.port.setValue(-1)
-        self.integrated = QCheckBox("Windows authentication (SQL Server only)")
+        self.integrated = QCheckBox("Windows authentication")
         self.username = QLineEdit()
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
@@ -62,13 +62,10 @@ class ServerForm(QWidget):
         self._form.setRowVisible(self.username, not integrated)
         self._form.setRowVisible(self.password, not integrated)
 
-    def problem(self, sql_type: SQLType) -> str | None:
+    def problem(self) -> str | None:
         if not self.host.text().strip():
             return "the 'Host' field is empty"
-        if self.integrated.isChecked():
-            if sql_type is SQLType.MYSQL:
-                return "Integrated Security is only supported for Transact-SQL"
-        else:
+        if not self.integrated.isChecked():
             if not self.username.text().strip():
                 return "the 'Username' field is empty"
             if not self.password.text():
@@ -96,10 +93,8 @@ class SqlCompareDialog(ItemFormDialog):
                          "Update" if item else "Add")
         self._item = item
         self.name = QLineEdit(item.description if item else "")
-        type_box, self.type_group = radio_group(SQLType, item.sql_type if item else None)
         self.procedure = QLineEdit(item.procedure_name if item else "")
         self.form.addRow("Display Text", self.name)
-        self.form.addRow("SQL Type", type_box)
         self.form.addRow("Procedure Name", self.procedure)
 
         self.new_tab_name = QLineEdit()
@@ -160,9 +155,8 @@ class SqlCompareDialog(ItemFormDialog):
         pages = self._server_pages()
         if not pages:
             raise ValidationError("Add at least one server tab")
-        sql_type = selected_member(SQLType, self.type_group)
         for tab_name, page in pages:
-            problem = page.problem(sql_type)
+            problem = page.problem()
             if problem:
                 self.tabs.setCurrentWidget(page)
                 raise ValidationError(f"Tab [{tab_name}] - {problem}")
@@ -171,7 +165,6 @@ class SqlCompareDialog(ItemFormDialog):
         fields = dict(
             description=self.name.text().strip(),
             procedure_name=self.procedure.text().strip(),
-            sql_type=selected_member(SQLType, self.type_group),
             servers=[page.to_config(name) for name, page in self._server_pages()],
         )
         if self._item:  # keep the same id so saved passwords stay linked
