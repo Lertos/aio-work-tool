@@ -8,7 +8,7 @@ model can safely add/remove rows after the mouse event has finished.
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QIcon, QPalette
+from PySide6.QtGui import QColor, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (QApplication, QListView, QStyle, QStyledItemDelegate,
                                QStyleOptionButton, QStyleOptionViewItem)
 
@@ -30,8 +30,21 @@ class ActionRowDelegate(QStyledItemDelegate):
         super().__init__(view)
         self._view = view
         self._show_actions = show_actions
-        self._icons = {EDIT: QIcon(str(EDIT_ICON)), DELETE: QIcon(str(DELETE_ICON))}
+        self._sources = {EDIT: QPixmap(str(EDIT_ICON)), DELETE: QPixmap(str(DELETE_ICON))}
+        self._icons: dict[tuple[str, int], QIcon] = {}  # (name, rgba) -> tinted icon
         self._pressed: tuple | None = None  # (row, region, button) of the current press
+
+    def _icon(self, name: str, color: QColor) -> QIcon:
+        """The icon recolored to ``color`` so it stays visible in both light and dark themes."""
+        key = (name, color.rgba())
+        if key not in self._icons:
+            pixmap = QPixmap(self._sources[name])
+            painter = QPainter(pixmap)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), color)  # keeps the alpha, replaces the color
+            painter.end()
+            self._icons[key] = QIcon(pixmap)
+        return self._icons[key]
 
     # ---------------------------------------------------------------- geometry
     def _button_rects(self, rect: QRect) -> dict[str, QRect]:
@@ -94,7 +107,7 @@ class ActionRowDelegate(QStyledItemDelegate):
         for name, rect in self._button_rects(opt.rect).items():
             button = QStyleOptionButton()
             button.rect = rect
-            button.icon = self._icons[name]
+            button.icon = self._icon(name, opt.palette.color(QPalette.ColorRole.ButtonText))
             button.iconSize = QSize(ICON_SIZE, ICON_SIZE)
             button.state = QStyle.StateFlag.State_Enabled
             if self._pressed and self._pressed[:2] == (index.row(), name):
