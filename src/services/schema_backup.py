@@ -19,68 +19,18 @@ from pathlib import Path
 from typing import Callable
 
 from ..model.items import SchemaEnvironment
-from .odbc import best_driver
+from .odbc import build_connection_string
 
 # fetch(connection_string, entities) -> {entity: definition, or None if not found}
 Fetcher = Callable[[str, list[str]], "dict[str, str | None]"]
 
-_SERVER_KEYS = {"server", "data source", "address", "addr", "network address"}
-_DATABASE_KEYS = {"database", "initial catalog"}
-_AUTH_KEYS = {"uid", "user id", "trusted_connection", "integrated security", "authentication"}
 _BAD_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 # ------------------------------------------------------------------ connection strings
 
-def _parse(conn_str: str) -> list[tuple[str, str]]:
-    """Split ``key=value;...`` into pairs; ``{...}`` values may contain ``;``."""
-    pairs, i, n = [], 0, len(conn_str)
-    while i < n:
-        eq = conn_str.find("=", i)
-        if eq == -1:
-            break
-        key = conn_str[i:eq].strip().strip(";").strip()
-        j = eq + 1
-        while j < n and conn_str[j] == " ":
-            j += 1
-        if j < n and conn_str[j] == "{":
-            end = j + 1
-            while end < n:  # "}}" is an escaped brace inside a braced value
-                if conn_str[end] == "}":
-                    if end + 1 < n and conn_str[end + 1] == "}":
-                        end += 2
-                        continue
-                    break
-                end += 1
-            value = conn_str[j:end + 1]
-            i = conn_str.find(";", end) + 1 or n
-        else:
-            semi = conn_str.find(";", j)
-            semi = n if semi == -1 else semi
-            value = conn_str[j:semi].strip()
-            i = semi + 1
-        if key:
-            pairs.append((key, value))
-    return pairs
-
-
 def connection_string(env: SchemaEnvironment, database: str, driver: str | None = None) -> str:
-    """The environment's connection string with the driver, server and database filled in.
-
-    Anything the user typed wins, except the database, which is always the one
-    being backed up. With no login given, Windows authentication is used.
-    """
-    pairs = [(k, v) for k, v in _parse(env.connection_string)
-             if k.lower() not in _DATABASE_KEYS]
-    keys = {k.lower() for k, _ in pairs}
-    if "driver" not in keys:
-        pairs.insert(0, ("DRIVER", driver or best_driver()))
-    if not keys & _SERVER_KEYS:
-        pairs.insert(1, ("SERVER", env.server))
-    pairs.append(("DATABASE", "{" + database.replace("}", "}}") + "}"))
-    if not keys & _AUTH_KEYS:
-        pairs.append(("Trusted_Connection", "yes"))
-    return ";".join(f"{k}={v}" for k, v in pairs)
+    return build_connection_string(env.server, env.connection_string, database, driver)
 
 
 # ------------------------------------------------------------------------- backup

@@ -6,7 +6,8 @@ from pathlib import Path
 
 from src.model.items import SchemaEnvironment
 from src.model.storage import MemorySecrets, Storage
-from src.services.schema_backup import (_parse, backup, connection_string, safe_filename,
+from src.services.odbc import _parse
+from src.services.schema_backup import (backup, connection_string, safe_filename,
                                         split_names)
 
 try:

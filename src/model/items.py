@@ -114,6 +114,18 @@ class SchemaEnvironment:
     id: str = field(default_factory=_new_id)  # stable key for the connection string in the OS keyring
 
 
+@dataclass
+class SavedQuery:
+    """A repeatable SQL Server query for the Queries tab."""
+
+    description: str
+    server: str
+    query: str
+    recent_databases: list[str] = field(default_factory=list)  # most recent first
+    connection_string: str = field(default="", repr=False)  # never persisted to JSON, see storage.py
+    id: str = field(default_factory=_new_id)  # stable key for the connection string in the OS keyring
+
+
 # ---------------------------------------------------------------- (de)serialisation
 
 _ENUM_FIELDS = {"path_type": PathType, "promote_type": PromoteType, "sql_type": SQLType}
@@ -127,7 +139,7 @@ def item_to_dict(item) -> dict:
     if isinstance(item, SQLCompareItem):
         for server in data["servers"]:
             server.pop("password", None)
-    if isinstance(item, SchemaEnvironment):
+    if isinstance(item, (SchemaEnvironment, SavedQuery)):
         data.pop("connection_string", None)
     return data
 

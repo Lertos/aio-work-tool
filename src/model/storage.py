@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .item_store import ItemStore
-from .items import (CopyItem, FolderItem, InfoItem, PromoteItem, SchemaEnvironment,
+from .items import (CopyItem, FolderItem, InfoItem, PromoteItem, SavedQuery, SchemaEnvironment,
                     SQLCompareItem, SurroundItem, TodoItem, item_from_dict, item_to_dict)
 
 SCHEMA_VERSION = 1
@@ -35,7 +35,11 @@ LIST_FILES = {
     "sql_compare": SQLCompareItem,
     "surround": SurroundItem,
     "schema_backup": SchemaEnvironment,
+    "queries": SavedQuery,
 }
+
+# Lists whose items keep a connection_string in the OS keyring, and the key prefix for each.
+_CONNECTION_KEY_PREFIX = {SchemaEnvironment: "schema", SavedQuery: "query"}
 
 
 class SecretStore(Protocol):
@@ -85,8 +89,8 @@ def _secret_key(item: SQLCompareItem, tab_name: str) -> str:
     return f"{item.id}/{tab_name}"
 
 
-def _connection_key(env: SchemaEnvironment) -> str:
-    return f"schema/{env.id}"
+def _connection_key(item: SchemaEnvironment | SavedQuery) -> str:
+    return f"{_CONNECTION_KEY_PREFIX[type(item)]}/{item.id}"
 
 
 class Storage:
@@ -114,15 +118,15 @@ class Storage:
         if cls is SQLCompareItem:
             for item in active + history:
                 self._load_passwords(item)
-        if cls is SchemaEnvironment:
-            for env in active + history:
-                env.connection_string = self.secrets.get(_connection_key(env)) or ""
+        if cls in _CONNECTION_KEY_PREFIX:
+            for item in active + history:
+                item.connection_string = self.secrets.get(_connection_key(item)) or ""
         return ItemStore(active, history, save=lambda store, n=name: self.save(n, store))
 
     def save(self, name: str, store: ItemStore) -> None:
         if LIST_FILES[name] is SQLCompareItem:
             self._sync_passwords(store)
-        if LIST_FILES[name] is SchemaEnvironment:
+        if LIST_FILES[name] in _CONNECTION_KEY_PREFIX:
             self._sync_connection_strings(store)
         payload = {
             "version": SCHEMA_VERSION,
@@ -163,8 +167,8 @@ class Storage:
 
     def _sync_connection_strings(self, store: ItemStore) -> None:
         # Same rule as passwords: history keeps its secret so "Undo Delete" works.
-        for env in store.active + store.history:
-            if env.connection_string:
-                self.secrets.set(_connection_key(env), env.connection_string)
+        for item in store.active + store.history:
+            if item.connection_string:
+                self.secrets.set(_connection_key(item), item.connection_string)
             else:
-                self.secrets.delete(_connection_key(env))
+                self.secrets.delete(_connection_key(item))

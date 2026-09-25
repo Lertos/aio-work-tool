@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QMainWindow, QTabWidget
 from ..config import APP_NAME, DEFAULT_WINDOW_SIZE
 from ..model.storage import Storage
 from .tabs.promoter_tab import PromoterTab
+from .tabs.saved_query_tab import SavedQueryTab
 from .tabs.schema_backup_tab import SchemaBackupTab
 from .tabs.simple_tabs import CopyTab, FoldersTab, InfoTab
 from .tabs.sql_compare_tab import SqlCompareTab
@@ -35,6 +36,7 @@ class MainWindow(QMainWindow):
             SqlCompareTab(stores["sql_compare"]),
             SurroundTab(stores["surround"]),
             SchemaBackupTab(stores["schema_backup"]),
+            SavedQueryTab(stores["queries"]),
         ]
         for i, page in enumerate(pages):
             self.tabs.addTab(page, page.TITLE)
