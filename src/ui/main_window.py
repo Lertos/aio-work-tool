@@ -12,6 +12,7 @@ from ..model.storage import Storage
 from .tabs.promoter_tab import PromoterTab
 from .tabs.simple_tabs import CopyTab, FoldersTab, InfoTab
 from .tabs.sql_compare_tab import SqlCompareTab
+from .tabs.surround_tab import SurroundTab
 from .tabs.todo_tab import TodoTab
 
 
@@ -31,11 +32,12 @@ class MainWindow(QMainWindow):
             PromoterTab(stores["promote"]),
             InfoTab(stores["info"]),
             SqlCompareTab(stores["sql_compare"]),
+            SurroundTab(stores["surround"]),
         ]
         for i, page in enumerate(pages):
             self.tabs.addTab(page, page.TITLE)
             self.tabs.setTabToolTip(i, f"Press {i + 1}")
-            shortcut = QShortcut(QKeySequence(str(i + 1)), self)  # keys 1-6 switch tabs
+            shortcut = QShortcut(QKeySequence(str(i + 1)), self)  # number keys switch tabs
             shortcut.activated.connect(partial(self.tabs.setCurrentIndex, i))
 
         # Window size/position and last tab are remembered between runs

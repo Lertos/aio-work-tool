@@ -21,7 +21,7 @@ from typing import Protocol
 
 from .item_store import ItemStore
 from .items import (CopyItem, FolderItem, InfoItem, PromoteItem, SQLCompareItem,
-                    TodoItem, item_from_dict, item_to_dict)
+                    SurroundItem, TodoItem, item_from_dict, item_to_dict)
 
 SCHEMA_VERSION = 1
 KEYRING_SERVICE = "work-aio-tool"
@@ -33,6 +33,7 @@ LIST_FILES = {
     "promote": PromoteItem,
     "info": InfoItem,
     "sql_compare": SQLCompareItem,
+    "surround": SurroundItem,
 }
 
 

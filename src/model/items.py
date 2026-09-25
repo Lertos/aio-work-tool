@@ -59,6 +59,19 @@ class InfoItem:
 
 
 @dataclass
+class SurroundItem:
+    prefix: str = ""
+    suffix: str = ""
+    remove_final_suffix: bool = False
+
+    @property
+    def description(self) -> str:
+        """Row text, e.g. ``'…',`` - shows what each line will be wrapped in."""
+        text = f"{self.prefix}…{self.suffix}"
+        return f"{text}   (no final separator)" if self.remove_final_suffix and self.suffix else text
+
+
+@dataclass
 class PromoteItem:
     description: str
     path_type: PathType = PathType.FILE_NAMES_SEPARATE
