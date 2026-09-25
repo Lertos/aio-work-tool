@@ -1,4 +1,4 @@
 PySide6>=6.5
 keyring>=24        # SQL passwords -> Windows Credential Manager
 pymysql>=1.1       # SQL Compare: MySQL
-pyodbc>=5.0        # SQL Compare: SQL Server (needs "ODBC Driver 18 for SQL Server")
+pyodbc>=5.0        # SQL Server; uses ODBC Driver 18, else 17, else the built-in "SQL Server" driver

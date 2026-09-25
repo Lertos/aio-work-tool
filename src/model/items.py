@@ -103,6 +103,17 @@ class SQLCompareItem:
     id: str = field(default_factory=_new_id)  # stable key for passwords in the OS keyring
 
 
+@dataclass
+class SchemaEnvironment:
+    """A SQL Server + its databases, for the Schema Backup tab."""
+
+    description: str
+    server: str
+    databases: list[str] = field(default_factory=list)
+    connection_string: str = field(default="", repr=False)  # never persisted to JSON, see storage.py
+    id: str = field(default_factory=_new_id)  # stable key for the connection string in the OS keyring
+
+
 # ---------------------------------------------------------------- (de)serialisation
 
 _ENUM_FIELDS = {"path_type": PathType, "promote_type": PromoteType, "sql_type": SQLType}
@@ -116,6 +127,8 @@ def item_to_dict(item) -> dict:
     if isinstance(item, SQLCompareItem):
         for server in data["servers"]:
             server.pop("password", None)
+    if isinstance(item, SchemaEnvironment):
+        data.pop("connection_string", None)
     return data
 
 

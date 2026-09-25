@@ -30,7 +30,7 @@ def main() -> int:
 
     if isinstance(secrets, MemorySecrets):
         QMessageBox.warning(window, APP_NAME,
-                            "The 'keyring' package isn't installed, so SQL passwords will "
+                            "The 'keyring' package isn't installed, so SQL passwords and connection strings will "
                             "only be kept until the app closes.\n\nInstall it with:\n"
                             "    pip install keyring")
     return app.exec()

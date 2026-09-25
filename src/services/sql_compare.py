@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from ..model.items import ServerConfig, SQLCompareItem, SQLType
+from .odbc import best_driver
 
 # fetch(sql_type, server, database, procedure) -> definition text, or None if not found
 Fetcher = Callable[[SQLType, ServerConfig, str, str], "str | None"]
@@ -132,7 +133,7 @@ def _fetch_tsql(server: ServerConfig, database: str, procedure: str) -> str | No
 
     host = f"{server.host},{server.port}" if server.port > 0 else server.host
     parts = [
-        "DRIVER={ODBC Driver 18 for SQL Server}",
+        f"DRIVER={best_driver()}",
         f"SERVER={host}",
         f"DATABASE={database}",
         "Encrypt=yes",

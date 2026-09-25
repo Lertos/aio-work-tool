@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Protocol
 
 from .item_store import ItemStore
-from .items import (CopyItem, FolderItem, InfoItem, PromoteItem, SQLCompareItem,
-                    SurroundItem, TodoItem, item_from_dict, item_to_dict)
+from .items import (CopyItem, FolderItem, InfoItem, PromoteItem, SchemaEnvironment,
+                    SQLCompareItem, SurroundItem, TodoItem, item_from_dict, item_to_dict)
 
 SCHEMA_VERSION = 1
 KEYRING_SERVICE = "work-aio-tool"
@@ -34,6 +34,7 @@ LIST_FILES = {
     "info": InfoItem,
     "sql_compare": SQLCompareItem,
     "surround": SurroundItem,
+    "schema_backup": SchemaEnvironment,
 }
 
 
@@ -84,6 +85,10 @@ def _secret_key(item: SQLCompareItem, tab_name: str) -> str:
     return f"{item.id}/{tab_name}"
 
 
+def _connection_key(env: SchemaEnvironment) -> str:
+    return f"schema/{env.id}"
+
+
 class Storage:
     def __init__(self, data_dir: Path | str, secrets: SecretStore) -> None:
         self.data_dir = Path(data_dir)
@@ -109,11 +114,16 @@ class Storage:
         if cls is SQLCompareItem:
             for item in active + history:
                 self._load_passwords(item)
+        if cls is SchemaEnvironment:
+            for env in active + history:
+                env.connection_string = self.secrets.get(_connection_key(env)) or ""
         return ItemStore(active, history, save=lambda store, n=name: self.save(n, store))
 
     def save(self, name: str, store: ItemStore) -> None:
         if LIST_FILES[name] is SQLCompareItem:
             self._sync_passwords(store)
+        if LIST_FILES[name] is SchemaEnvironment:
+            self._sync_connection_strings(store)
         payload = {
             "version": SCHEMA_VERSION,
             "active": [item_to_dict(i) for i in store.active],
@@ -150,3 +160,11 @@ class Storage:
                     self.secrets.set(key, server.password)
                 else:
                     self.secrets.delete(key)
+
+    def _sync_connection_strings(self, store: ItemStore) -> None:
+        # Same rule as passwords: history keeps its secret so "Undo Delete" works.
+        for env in store.active + store.history:
+            if env.connection_string:
+                self.secrets.set(_connection_key(env), env.connection_string)
+            else:
+                self.secrets.delete(_connection_key(env))

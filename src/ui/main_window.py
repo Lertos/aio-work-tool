@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QMainWindow, QTabWidget
 from ..config import APP_NAME, DEFAULT_WINDOW_SIZE
 from ..model.storage import Storage
 from .tabs.promoter_tab import PromoterTab
+from .tabs.schema_backup_tab import SchemaBackupTab
 from .tabs.simple_tabs import CopyTab, FoldersTab, InfoTab
 from .tabs.sql_compare_tab import SqlCompareTab
 from .tabs.surround_tab import SurroundTab
@@ -33,6 +34,7 @@ class MainWindow(QMainWindow):
             InfoTab(stores["info"]),
             SqlCompareTab(stores["sql_compare"]),
             SurroundTab(stores["surround"]),
+            SchemaBackupTab(stores["schema_backup"]),
         ]
         for i, page in enumerate(pages):
             self.tabs.addTab(page, page.TITLE)
@@ -45,7 +47,9 @@ class MainWindow(QMainWindow):
         self._settings = QSettings()
         geometry = self._settings.value("window/geometry")
         if geometry is None or not self.restoreGeometry(geometry):
-            self.resize(*DEFAULT_WINDOW_SIZE)
+            # First run: wide enough to show every tab label without the scroll arrows.
+            width, height = DEFAULT_WINDOW_SIZE
+            self.resize(max(width, self.tabs.tabBar().sizeHint().width()), height)
         self.tabs.setCurrentIndex(int(self._settings.value("window/tab", 0)))
 
     def closeEvent(self, event) -> None:
