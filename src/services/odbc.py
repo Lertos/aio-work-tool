@@ -53,8 +53,13 @@ def _parse(conn_str: str) -> list[tuple[str, str]]:
     return pairs
 
 
-def build_connection_string(server: str, extra: str, database: str, driver: str | None = None) -> str:
-    """``extra`` (what the user typed) with the driver, server and database filled in.
+def server_from(conn_str: str) -> str:
+    """The server named in a connection string, or "" if it has none."""
+    return next((v for k, v in _parse(conn_str) if k.lower() in _SERVER_KEYS and v), "")
+
+
+def build_connection_string(extra: str, database: str, driver: str | None = None) -> str:
+    """``extra`` (what the user typed, including the server) with the driver and database filled in.
 
     Anything the user typed wins, except the database, which is always the one
     asked for. With no login given, Windows authentication is used.
@@ -63,8 +68,6 @@ def build_connection_string(server: str, extra: str, database: str, driver: str 
     keys = {k.lower() for k, _ in pairs}
     if "driver" not in keys:
         pairs.insert(0, ("DRIVER", driver or best_driver()))
-    if not keys & _SERVER_KEYS:
-        pairs.insert(1, ("SERVER", server))
     pairs.append(("DATABASE", "{" + database.replace("}", "}}") + "}"))
     if not keys & _AUTH_KEYS:
         pairs.append(("Trusted_Connection", "yes"))

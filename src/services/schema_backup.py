@@ -30,7 +30,7 @@ _BAD_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 # ------------------------------------------------------------------ connection strings
 
 def connection_string(env: SchemaEnvironment, database: str, driver: str | None = None) -> str:
-    return build_connection_string(env.server, env.connection_string, database, driver)
+    return build_connection_string(env.connection_string, database, driver)
 
 
 # ------------------------------------------------------------------------- backup

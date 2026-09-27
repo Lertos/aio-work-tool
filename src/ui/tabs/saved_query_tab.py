@@ -4,6 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from ...services.odbc import server_from
 from ...services.saved_query import QueryResult, run_query
 from ..dialogs.query_results_dialog import QueryResultsDialog
 from ..dialogs.saved_query_dialog import SavedQueryDialog
@@ -18,7 +19,7 @@ class SavedQueryTab(ItemListTab):
 
     def tooltip(self, item) -> str:
         last = item.recent_databases[0] if item.recent_databases else "none yet"
-        return f"{item.server} - last database: {last}\n\n{item.query[:500]}"
+        return f"{server_from(item.connection_string)} - last database: {last}\n\n{item.query[:500]}"
 
     def open_editor(self, item):
         return SavedQueryDialog.ask(self, item)

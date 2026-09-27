@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from ...services.odbc import server_from
 from ...services.schema_backup import BackupResult, backup
 from ..dialogs.schema_backup_dialog import SchemaEnvironmentDialog
 from ..dialogs.schema_backup_run_dialog import SchemaBackupRunDialog
@@ -18,7 +19,7 @@ class SchemaBackupTab(ItemListTab):
     _busy = False
 
     def tooltip(self, item) -> str:
-        return f"{item.server}\n{', '.join(item.databases) or 'no saved databases'}"
+        return f"{server_from(item.connection_string)}\n{', '.join(item.databases) or 'no saved databases'}"
 
     def open_editor(self, item):
         return SchemaEnvironmentDialog.ask(self, item)

@@ -6,6 +6,7 @@ import dataclasses
 from PySide6.QtWidgets import QLineEdit
 
 from ...model.items import SchemaEnvironment
+from ...services.odbc import server_from
 from ...services.schema_backup import split_names
 from ..widgets import text_box
 from .item_form_dialog import ItemFormDialog, ValidationError
@@ -18,32 +19,29 @@ class SchemaEnvironmentDialog(ItemFormDialog):
         self._item = item
         self.name = QLineEdit(item.description if item else "")
         self.name.setPlaceholderText("Optional, e.g. Prod - defaults to the server name")
-        self.server = QLineEdit(item.server if item else "")
-        self.server.setPlaceholderText(r"e.g. SQLPROD01 or SQLPROD01\INSTANCE,1433")
         self.connection = QLineEdit(item.connection_string if item else "")
-        self.connection.setPlaceholderText("Optional, e.g. UID=me;PWD=secret;TrustServerCertificate=yes")
+        self.connection.setPlaceholderText("e.g. Server=SQLPROD01;UID=me;PWD=secret;TrustServerCertificate=yes")
         self.connection.setToolTip(
-            "Extra ODBC settings, or a full connection string.\n"
-            "Blank = Windows login. Driver, Server and Database are filled in for you.\n"
+            "ODBC connection string - must include Server=...\n"
+            "No login given = Windows login. Driver and Database are filled in for you.\n"
             "Stored in Windows Credential Manager, not in the app's data files.")
         self.databases = text_box("\n".join(item.databases) if item else "",
                                   "One per line - these fill the database dropdown", rows=5)
 
         self.form.addRow("Display Text", self.name)
-        self.form.addRow("Server Name", self.server)
         self.form.addRow("Connection String", self.connection)
         self.form.addRow("Databases", self.databases)
         self.resize(480, self.sizeHint().height())
 
     def validate(self) -> None:
-        if not self.server.text().strip():
-            raise ValidationError("'Server Name' cannot be empty")
+        if not server_from(self.connection.text()):
+            raise ValidationError("'Connection String' must include Server=...")
 
     def build_result(self) -> SchemaEnvironment:
-        values = dict(description=self.name.text().strip() or self.server.text().strip(),
-                      server=self.server.text().strip(),
+        connection = self.connection.text().strip()
+        values = dict(description=self.name.text().strip() or server_from(connection),
                       databases=split_names(self.databases.toPlainText()),
-                      connection_string=self.connection.text().strip())
+                      connection_string=connection)
         if self._item:  # keep the id so the stored connection string stays linked
             return dataclasses.replace(self._item, **values)
         return SchemaEnvironment(**values)

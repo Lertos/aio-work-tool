@@ -51,7 +51,7 @@ def remember_database(item: SavedQuery, database: str, keep: int = 10) -> list[s
 
 def run_query(item: SavedQuery, database: str, execute: Executor | None = None) -> QueryResult:
     execute = execute or execute_batches
-    conn_str = build_connection_string(item.server, item.connection_string, database)
+    conn_str = build_connection_string(item.connection_string, database)
     return execute(conn_str, split_batches(item.query))
 
 

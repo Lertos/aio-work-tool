@@ -102,7 +102,6 @@ class SchemaEnvironment:
     """A SQL Server + its databases, for the Schema Backup tab."""
 
     description: str
-    server: str
     databases: list[str] = field(default_factory=list)
     connection_string: str = field(default="", repr=False)  # never persisted to JSON, see storage.py
     id: str = field(default_factory=_new_id)  # stable key for the connection string in the OS keyring
@@ -113,7 +112,6 @@ class SavedQuery:
     """A repeatable SQL Server query for the Queries tab."""
 
     description: str
-    server: str
     query: str
     recent_databases: list[str] = field(default_factory=list)  # most recent first
     connection_string: str = field(default="", repr=False)  # never persisted to JSON, see storage.py

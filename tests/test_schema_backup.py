@@ -6,7 +6,7 @@ from pathlib import Path
 
 from src.model.items import SchemaEnvironment
 from src.model.storage import MemorySecrets, Storage
-from src.services.odbc import _parse
+from src.services.odbc import _parse, server_from
 from src.services.schema_backup import (backup, connection_string, safe_filename,
                                         split_names)
 
@@ -21,22 +21,29 @@ NOW = datetime(2026, 9, 25, 14, 30, 12)
 D18 = "{ODBC Driver 18 for SQL Server}"
 
 
-def env(conn="", **kw):
-    return SchemaEnvironment(kw.pop("description", "Prod"), kw.pop("server", "SQL01"),
-                             ["Sales", "HR"], connection_string=conn, **kw)
+def env(conn="Server=SQL01", **kw):
+    return SchemaEnvironment(kw.pop("description", "Prod"), ["Sales", "HR"],
+                             connection_string=conn, **kw)
 
 
 class ConnectionStringTests(unittest.TestCase):
-    def test_blank_uses_windows_login(self):
+    def test_no_login_uses_windows_login(self):
         self.assertEqual(connection_string(env(), "Sales", D18),
-                         "DRIVER={ODBC Driver 18 for SQL Server};SERVER=SQL01;"
+                         "DRIVER={ODBC Driver 18 for SQL Server};Server=SQL01;"
                          "DATABASE={Sales};Trusted_Connection=yes")
 
     def test_user_settings_kept_and_no_trusted_when_login_given(self):
-        cs = connection_string(env("UID=me;PWD={a;b}};c};TrustServerCertificate=yes"), "HR", D18)
+        cs = connection_string(
+            env("Server=SQL01;UID=me;PWD={a;b}};c};TrustServerCertificate=yes"), "HR", D18)
         self.assertIn("UID=me;PWD={a;b}};c};TrustServerCertificate=yes", cs)
         self.assertNotIn("Trusted_Connection", cs)
-        self.assertTrue(cs.startswith("DRIVER={ODBC Driver 18 for SQL Server};SERVER=SQL01;"))
+        self.assertTrue(cs.startswith("DRIVER={ODBC Driver 18 for SQL Server};Server=SQL01;"))
+
+    def test_server_from(self):
+        self.assertEqual(server_from("UID=me;Server=SQL01\\INST,1433;PWD=x"), "SQL01\\INST,1433")
+        self.assertEqual(server_from("Data Source={OTHER;1};Trusted_Connection=yes"), "{OTHER;1}")
+        self.assertEqual(server_from("UID=me;PWD=x"), "")
+        self.assertEqual(server_from(""), "")
 
     def test_full_string_keeps_its_server_and_driver_but_database_is_replaced(self):
         cs = connection_string(
@@ -106,14 +113,14 @@ class StorageTests(unittest.TestCase):
             secrets = MemorySecrets()
             storage = Storage(tmp, secrets)
             store = storage.load("schema_backup")
-            item = env("UID=me;PWD=hunter2")
+            item = env("Server=SQL01;UID=me;PWD=hunter2")
             store.add(item)
             raw = Path(tmp, "schema_backup.json").read_text(encoding="utf-8")
             self.assertNotIn("hunter2", raw)
             self.assertEqual(json.loads(raw)["active"][0]["databases"], ["Sales", "HR"])
             self.assertEqual(Storage(tmp, secrets).load("schema_backup").active, [item])
             self.assertEqual(Storage(tmp, secrets).load("schema_backup")[0].connection_string,
-                             "UID=me;PWD=hunter2")
+                             "Server=SQL01;UID=me;PWD=hunter2")
 
 
 @unittest.skipUnless(HAVE_QT, "PySide6 not installed")

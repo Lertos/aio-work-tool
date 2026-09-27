@@ -8,6 +8,7 @@ from PySide6.QtCore import QSettings, QStandardPaths
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLineEdit, QToolButton, QWidget
 
 from ...model.items import SchemaEnvironment
+from ...services.odbc import server_from
 from ...services.schema_backup import split_names
 from ..widgets import CheckComboBox, text_box
 from .item_form_dialog import ItemFormDialog, ValidationError
@@ -30,7 +31,7 @@ def _default_save_to() -> str:
 class SchemaBackupRunDialog(ItemFormDialog):
     def __init__(self, parent, env: SchemaEnvironment):
         super().__init__(parent, f"Schema Backup - {env.description}", "Back Up")
-        server = QLineEdit(env.server)
+        server = QLineEdit(server_from(env.connection_string))
         server.setReadOnly(True)
         self.entities = text_box("", "Procedures, functions, triggers or views - one per line\n"
                                      "e.g. dbo.usp_GetOrders", rows=7)

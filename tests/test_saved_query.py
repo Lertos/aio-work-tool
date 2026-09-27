@@ -17,9 +17,10 @@ except ImportError:
 
 
 def query(**kw):
-    base = dict(description="Stuck orders", server="SQL01",
+    base = dict(description="Stuck orders",
                 query="SELECT * FROM Orders WHERE Status = 'Stuck'",
-                recent_databases=["Sales", "SalesArchive"], connection_string="UID=me;PWD=pw")
+                recent_databases=["Sales", "SalesArchive"],
+                connection_string="Server=SQL01;UID=me;PWD=pw")
     base.update(kw)
     return SavedQuery(**base)
 
@@ -43,9 +44,8 @@ class ServiceTests(unittest.TestCase):
             return QueryResult([ResultSet(["n"], [(1,)])])
 
         result = run_query(query(query="SELECT 1\nGO\nSELECT 2"), "HR", execute)
-        self.assertIn("SERVER=SQL01;", seen["cs"])
+        self.assertIn("Server=SQL01;UID=me;PWD=pw", seen["cs"])
         self.assertIn("DATABASE={HR}", seen["cs"])
-        self.assertIn("UID=me;PWD=pw", seen["cs"])
         self.assertEqual(seen["batches"], ["SELECT 1", "SELECT 2"])
         self.assertEqual(result.result_sets[0].rows, [(1,)])
 
@@ -84,9 +84,21 @@ class UiTests(unittest.TestCase):
     def test_add_dialog_defaults_display_text_to_first_query_line(self):
         from src.ui.dialogs.saved_query_dialog import SavedQueryDialog
         dialog = SavedQueryDialog(None)
-        dialog.server.setText("SQL01")
+        dialog.connection.setText("Server=SQL01")
         dialog.query.setPlainText("\n  -- Find stuck orders\nSELECT 1")
         self.assertEqual(dialog.build_result().description, "-- Find stuck orders")
+        dialog.deleteLater()
+
+    def test_connection_string_must_name_a_server(self):
+        from src.ui.dialogs.item_form_dialog import ValidationError
+        from src.ui.dialogs.saved_query_dialog import SavedQueryDialog
+        dialog = SavedQueryDialog(None)
+        dialog.query.setPlainText("SELECT 1")
+        dialog.connection.setText("UID=me;PWD=pw")
+        with self.assertRaises(ValidationError):
+            dialog.validate()
+        dialog.connection.setText("Server=SQL01;UID=me;PWD=pw")
+        dialog.validate()
         dialog.deleteLater()
 
     def test_cells_format_and_copy_as_tsv(self):

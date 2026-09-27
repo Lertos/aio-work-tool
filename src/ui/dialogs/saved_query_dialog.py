@@ -7,6 +7,7 @@ from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import QComboBox, QLineEdit
 
 from ...model.items import SavedQuery
+from ...services.odbc import server_from
 from ...services.saved_query import remember_database
 from ..widgets import text_box
 from .item_form_dialog import ItemFormDialog, ValidationError
@@ -37,13 +38,11 @@ class SavedQueryDialog(ItemFormDialog):
 
         self.name = QLineEdit(item.description if item else "")
         self.name.setPlaceholderText("Optional - defaults to the first line of the query")
-        self.server = QLineEdit(item.server if item else "")
-        self.server.setPlaceholderText(r"e.g. SQLPROD01 or SQLPROD01\INSTANCE,1433")
         self.connection = QLineEdit(item.connection_string if item else "")
-        self.connection.setPlaceholderText("Optional, e.g. UID=me;PWD=secret;TrustServerCertificate=yes")
+        self.connection.setPlaceholderText("e.g. Server=SQLPROD01;UID=me;PWD=secret;TrustServerCertificate=yes")
         self.connection.setToolTip(
-            "Extra ODBC settings, or a full connection string.\n"
-            "Blank = Windows login. Driver, Server and Database are filled in for you.\n"
+            "ODBC connection string - must include Server=...\n"
+            "No login given = Windows login. Driver and Database are filled in for you.\n"
             "Stored in Windows Credential Manager, not in the app's data files.")
         self.query = text_box(item.query if item else "", "SELECT ...\n\nGO on its own line "
                                                           "separates batches", rows=12)
@@ -52,7 +51,6 @@ class SavedQueryDialog(ItemFormDialog):
         if run:
             self.form.addRow("Database", self.database)
         self.form.addRow("Display Text", self.name)
-        self.form.addRow("Server Name", self.server)
         self.form.addRow("Connection String", self.connection)
         self.form.addRow("Query", self.query)
         self.resize(620, self.sizeHint().height())
@@ -61,15 +59,15 @@ class SavedQueryDialog(ItemFormDialog):
     def validate(self) -> None:
         if self._run and not self.database.currentText().strip():
             raise ValidationError("Enter a database to run against")
-        if not self.server.text().strip():
-            raise ValidationError("'Server Name' cannot be empty")
+        if not server_from(self.connection.text()):
+            raise ValidationError("'Connection String' must include Server=...")
         if not self.query.toPlainText().strip():
             raise ValidationError("'Query' cannot be empty")
 
     def build_result(self):
         query = self.query.toPlainText().strip()
         values = dict(description=self.name.text().strip() or _default_description(query),
-                      server=self.server.text().strip(), query=query,
+                      query=query,
                       connection_string=self.connection.text().strip())
         item = dataclasses.replace(self._item, **values) if self._item else SavedQuery(**values)
         if not self._run:
