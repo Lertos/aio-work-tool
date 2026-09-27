@@ -6,7 +6,7 @@ File format::
 
 * Writes are atomic: data goes to a temp file first, then replaces the real
   file, so a crash mid-save can never leave a half-written list.
-* SQL passwords are never written to JSON. They go to the OS credential
+* SQL connection strings are never written to JSON. They go to the OS credential
   store (Windows Credential Manager) through the ``keyring`` package.
 * A corrupt file is renamed to ``<name>.json.bad`` and the list starts empty,
   so one broken file can't stop the app from opening.
@@ -117,7 +117,7 @@ class Storage:
                 active, history = [], []
         if cls is SQLCompareItem:
             for item in active + history:
-                self._load_passwords(item)
+                self._load_server_connections(item)
         if cls in _CONNECTION_KEY_PREFIX:
             for item in active + history:
                 item.connection_string = self.secrets.get(_connection_key(item)) or ""
@@ -125,7 +125,7 @@ class Storage:
 
     def save(self, name: str, store: ItemStore) -> None:
         if LIST_FILES[name] is SQLCompareItem:
-            self._sync_passwords(store)
+            self._sync_server_connections(store)
         if LIST_FILES[name] in _CONNECTION_KEY_PREFIX:
             self._sync_connection_strings(store)
         payload = {
@@ -150,23 +150,22 @@ class Storage:
             Path(tmp).unlink(missing_ok=True)
             raise
 
-    def _load_passwords(self, item: SQLCompareItem) -> None:
+    def _load_server_connections(self, item: SQLCompareItem) -> None:
         for server in item.servers:
-            if not server.integrated_security:
-                server.password = self.secrets.get(_secret_key(item, server.tab_name)) or ""
+            server.connection_string = self.secrets.get(_secret_key(item, server.tab_name)) or ""
 
-    def _sync_passwords(self, store: ItemStore) -> None:
-        # Items still in history keep their passwords so "Undo Delete" works.
+    def _sync_server_connections(self, store: ItemStore) -> None:
+        # Items still in history keep their connection strings so "Undo Delete" works.
         for item in store.active + store.history:
             for server in item.servers:
                 key = _secret_key(item, server.tab_name)
-                if server.password and not server.integrated_security:
-                    self.secrets.set(key, server.password)
+                if server.connection_string:
+                    self.secrets.set(key, server.connection_string)
                 else:
                     self.secrets.delete(key)
 
     def _sync_connection_strings(self, store: ItemStore) -> None:
-        # Same rule as passwords: history keeps its secret so "Undo Delete" works.
+        # Same rule as SQL Compare: history keeps its secret so "Undo Delete" works.
         for item in store.active + store.history:
             if item.connection_string:
                 self.secrets.set(_connection_key(item), item.connection_string)

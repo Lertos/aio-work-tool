@@ -1,23 +1,22 @@
 """Add/edit a SQL compare item and its server tabs (was SQLComparePopup).
 
 Improvements over Java:
+* Each server tab is just a connection string plus its databases.
 * ``ServerForm`` keeps its fields as attributes instead of looking them up by
   grid child index, so changing the layout can't break saving.
 * Server tabs can be removed (close button on each tab).
-* 'Databases' is always required; before, it was only checked when
-  Integrated Security was on.
-* Port is a spin box, so it can't be non-numeric; "Default" means use the
-  driver's default port.
+* 'Databases' is always required.
 """
 from __future__ import annotations
 
 import dataclasses
 
-from PySide6.QtWidgets import (QCheckBox, QFormLayout, QHBoxLayout, QLineEdit, QMessageBox,
-                               QPushButton, QSpinBox, QTabWidget, QWidget)
+from PySide6.QtWidgets import (QFormLayout, QHBoxLayout, QLineEdit, QMessageBox, QPushButton,
+                               QTabWidget, QVBoxLayout, QWidget)
 
 from ...config import SPACING
 from ...model.items import ServerConfig, SQLCompareItem
+from ...services.odbc import server_from
 from ..widgets import hline, lines, text_box
 from .item_form_dialog import ItemFormDialog, ValidationError
 
@@ -25,66 +24,36 @@ from .item_form_dialog import ItemFormDialog, ValidationError
 class ServerForm(QWidget):
     def __init__(self, server: ServerConfig | None = None):
         super().__init__()
-        self._form = QFormLayout(self)
-        self._form.setHorizontalSpacing(SPACING)
-        self._form.setVerticalSpacing(SPACING)
+        form = QFormLayout()
+        form.setHorizontalSpacing(SPACING)
+        form.setVerticalSpacing(SPACING)
+        outer = QVBoxLayout(self)
+        outer.addLayout(form)
+        outer.addStretch(1)  # keep the two rows at the top of the tab
 
-        self.host = QLineEdit()
-        self.port = QSpinBox()
-        self.port.setRange(-1, 65535)
-        self.port.setSpecialValueText("Default")
-        self.port.setValue(-1)
-        self.integrated = QCheckBox("Windows authentication")
-        self.username = QLineEdit()
-        self.password = QLineEdit()
-        self.password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.databases = text_box(placeholder="Each line is a new database", rows=3)
+        self.connection = QLineEdit(server.connection_string if server else "")
+        self.connection.setPlaceholderText("e.g. Server=SQLPROD01;UID=me;PWD=secret;TrustServerCertificate=yes")
+        self.connection.setToolTip(
+            "ODBC connection string - must include Server=...\n"
+            "No login given = Windows login. Driver and Database are filled in for you.\n"
+            "Stored in Windows Credential Manager, not in the app's data files.")
+        self.databases = text_box("\n".join(server.databases) if server else "",
+                                  "Each line is a new database", rows=3)
 
-        self._form.addRow("Host", self.host)
-        self._form.addRow("Port", self.port)
-        self._form.addRow("Integrated Security", self.integrated)
-        self._form.addRow("Username", self.username)
-        self._form.addRow("Password", self.password)
-        self._form.addRow("Databases", self.databases)
-
-        if server:
-            self.host.setText(server.host)
-            self.port.setValue(server.port)
-            self.integrated.setChecked(server.integrated_security)
-            self.username.setText(server.username)
-            self.password.setText(server.password)
-            self.databases.setPlainText("\n".join(server.databases))
-
-        self.integrated.toggled.connect(self._show_credentials)
-        self._show_credentials(self.integrated.isChecked())
-
-    def _show_credentials(self, integrated: bool) -> None:
-        self._form.setRowVisible(self.username, not integrated)
-        self._form.setRowVisible(self.password, not integrated)
+        form.addRow("Connection String", self.connection)
+        form.addRow("Databases", self.databases)
 
     def problem(self) -> str | None:
-        if not self.host.text().strip():
-            return "the 'Host' field is empty"
-        if not self.integrated.isChecked():
-            if not self.username.text().strip():
-                return "the 'Username' field is empty"
-            if not self.password.text():
-                return "the 'Password' field is empty"
+        if not server_from(self.connection.text()):
+            return "the 'Connection String' must include Server=..."
         if not lines(self.databases.toPlainText()):
             return "the 'Databases' field is empty"
         return None
 
     def to_config(self, tab_name: str) -> ServerConfig:
-        integrated = self.integrated.isChecked()
-        return ServerConfig(
-            tab_name=tab_name,
-            host=self.host.text().strip(),
-            port=self.port.value(),
-            username="" if integrated else self.username.text().strip(),
-            password="" if integrated else self.password.text(),
-            integrated_security=integrated,
-            databases=lines(self.databases.toPlainText()),
-        )
+        return ServerConfig(tab_name=tab_name,
+                            connection_string=self.connection.text().strip(),
+                            databases=lines(self.databases.toPlainText()))
 
 
 class SqlCompareDialog(ItemFormDialog):
@@ -94,6 +63,7 @@ class SqlCompareDialog(ItemFormDialog):
         self._item = item
         self.name = QLineEdit(item.description if item else "")
         self.procedure = QLineEdit(item.procedure_name if item else "")
+        self.procedure.setPlaceholderText("Optional - can be entered when you run the compare")
         self.form.addRow("Display Text", self.name)
         self.form.addRow("Procedure Name", self.procedure)
 
@@ -109,7 +79,7 @@ class SqlCompareDialog(ItemFormDialog):
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self._close_tab)
-        self.tabs.setMinimumSize(350, 300)
+        self.tabs.setMinimumSize(350, 200)
 
         self.body.insertWidget(1, hline())
         self.body.insertLayout(2, add_row)
@@ -150,8 +120,6 @@ class SqlCompareDialog(ItemFormDialog):
     def validate(self) -> None:
         if not self.name.text().strip():
             raise ValidationError("'Display Text' cannot be empty")
-        if not self.procedure.text().strip():
-            raise ValidationError("'Procedure Name' cannot be empty")
         pages = self._server_pages()
         if not pages:
             raise ValidationError("Add at least one server tab")
@@ -167,6 +135,6 @@ class SqlCompareDialog(ItemFormDialog):
             procedure_name=self.procedure.text().strip(),
             servers=[page.to_config(name) for name, page in self._server_pages()],
         )
-        if self._item:  # keep the same id so saved passwords stay linked
+        if self._item:  # keep the same id so saved connection strings stay linked
             return dataclasses.replace(self._item, **fields)
         return SQLCompareItem(**fields)

@@ -81,11 +81,7 @@ class ServerConfig:
     """One server tab of a SQL compare item (was ItemSQL)."""
 
     tab_name: str
-    host: str
-    port: int = -1  # -1 = use the driver's default port
-    username: str = ""
-    password: str = field(default="", repr=False)  # never persisted to JSON, see storage.py
-    integrated_security: bool = False
+    connection_string: str = field(default="", repr=False)  # never persisted to JSON, see storage.py
     databases: list[str] = field(default_factory=list)
 
 
@@ -94,7 +90,7 @@ class SQLCompareItem:
     description: str
     procedure_name: str
     servers: list[ServerConfig] = field(default_factory=list)
-    id: str = field(default_factory=_new_id)  # stable key for passwords in the OS keyring
+    id: str = field(default_factory=_new_id)  # stable key for connection strings in the OS keyring
 
 
 @dataclass
@@ -130,7 +126,7 @@ def item_to_dict(item) -> dict:
             data[key] = value.name
     if isinstance(item, SQLCompareItem):
         for server in data["servers"]:
-            server.pop("password", None)
+            server.pop("connection_string", None)
     if isinstance(item, (SchemaEnvironment, SavedQuery)):
         data.pop("connection_string", None)
     return data
@@ -142,6 +138,5 @@ def item_from_dict(cls, data: dict):
         if key in data:
             data[key] = enum_cls[data[key]]
     if cls is SQLCompareItem:
-        data.pop("sql_type", None)  # older files: the app used to support MySQL too
         data["servers"] = [ServerConfig(**s) for s in data.get("servers", [])]
     return cls(**data)

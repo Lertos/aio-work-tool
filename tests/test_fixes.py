@@ -51,7 +51,7 @@ class UndoVisibilityTests(unittest.TestCase):
 
 # ----------------------------------------------------------------- bug #2
 def _item(servers):
-    return SQLCompareItem("test", "usp_x", [ServerConfig(name, "h", databases=dbs) for name, dbs in servers])
+    return SQLCompareItem("test", "usp_x", [ServerConfig(name, "Server=h", databases=dbs) for name, dbs in servers])
 
 
 class SqlCompareTests(unittest.TestCase):
@@ -102,23 +102,16 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(again.active[0].promote_type, PromoteType.MOVE)
         self.assertEqual(again.history[0].description, "q")
 
-    def test_passwords_go_to_secret_store_not_json(self):
+    def test_connection_strings_go_to_secret_store_not_json(self):
         store = self.storage.load("sql_compare")
-        store.add(SQLCompareItem("x", "usp", [ServerConfig("prod", "h", username="u", password="hunter2")]))
+        cs = "Server=h;UID=u;PWD=hunter2"
+        store.add(SQLCompareItem("x", "usp", [ServerConfig("prod", cs, ["db"])]))
         raw = Path(self.tmp.name, "sql_compare.json").read_text()
         self.assertNotIn("hunter2", raw)
-        self.assertIn("hunter2", self.secrets.data.values())
+        self.assertIn(cs, self.secrets.data.values())
         again = self.storage.load("sql_compare")
-        self.assertEqual(again.active[0].servers[0].password, "hunter2")
-
-    def test_old_files_with_a_sql_type_still_load(self):
-        Path(self.tmp.name, "sql_compare.json").write_text(json.dumps({"version": 1, "history": [],
-            "active": [{"description": "x", "procedure_name": "usp", "sql_type": "MYSQL",
-                        "servers": [{"tab_name": "prod", "host": "h", "databases": ["db"]}],
-                        "id": "abc"}]}))
-        store = self.storage.load("sql_compare")
-        self.assertEqual(store.active[0].procedure_name, "usp")
-        self.assertFalse(Path(self.tmp.name, "sql_compare.json.bad").exists())
+        self.assertEqual(again.active[0].servers[0].connection_string, cs)
+        self.assertEqual(again.active[0].servers[0].databases, ["db"])
 
     def test_corrupt_file_is_set_aside(self):
         Path(self.tmp.name, "todo.json").write_text("{not json")
@@ -159,6 +152,48 @@ class DialogCancelTests(unittest.TestCase):
     def test_cancel_after_a_successful_run_returns_none(self):
         self.assertIsNotNone(self._run(press_accept=True))
         self.assertIsNone(self._run(press_accept=False))  # Java returned the previous item here
+
+
+@unittest.skipUnless(HAVE_QT, "PySide6 not installed")
+class SqlCompareDialogTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_server_tab_is_a_connection_string_and_databases(self):
+        from src.ui.dialogs.item_form_dialog import ValidationError
+        from src.ui.dialogs.sql_compare_dialog import SqlCompareDialog
+        item = _item([("prod", ["db1"])])
+        dialog = SqlCompareDialog(None, item)
+        page = dialog.tabs.widget(0)
+        page.connection.setText("UID=me;PWD=pw")
+        with self.assertRaises(ValidationError):
+            dialog.validate()
+        page.connection.setText("Server=SQL01;UID=me;PWD=pw")
+        page.databases.setPlainText("db1\ndb2")
+        dialog.validate()
+        result = dialog.build_result()
+        self.assertEqual(result.id, item.id)  # same record, so the keyring entries stay linked
+        self.assertEqual(result.servers, [ServerConfig("prod", "Server=SQL01;UID=me;PWD=pw",
+                                                       ["db1", "db2"])])
+        dialog.deleteLater()
+
+    def test_procedure_name_only_needed_to_run(self):
+        from src.ui.dialogs.item_form_dialog import ValidationError
+        from src.ui.dialogs.sql_compare_dialog import SqlCompareDialog
+        from src.ui.dialogs.sql_compare_run_dialog import SqlCompareRunDialog
+        item = _item([("prod", ["db1"])])
+        item.procedure_name = ""
+        dialog = SqlCompareDialog(None, item)
+        dialog.validate()  # saving without a procedure is fine
+        self.assertEqual(dialog.build_result().procedure_name, "")
+        dialog.deleteLater()
+        run = SqlCompareRunDialog(None, item)
+        with self.assertRaises(ValidationError):
+            run.validate()
+        run.procedure.setText("usp_x")
+        run.validate()
+        run.deleteLater()
 
 
 if __name__ == "__main__":

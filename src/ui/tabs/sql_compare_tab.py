@@ -17,7 +17,7 @@ class SqlCompareTab(ItemListTab):
 
     def tooltip(self, item) -> str:
         servers = ", ".join(s.tab_name for s in item.servers) or "no servers"
-        return f"{item.procedure_name} on {servers}"
+        return f"{item.procedure_name or '(no procedure yet)'} on {servers}"
 
     def open_editor(self, item):
         return SqlCompareDialog.ask(self, item)

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from ..model.items import ServerConfig, SQLCompareItem
-from .odbc import best_driver
+from .odbc import build_connection_string
 
 # fetch(server, database, procedure) -> definition text, or None if not found
 Fetcher = Callable[[ServerConfig, str, str], "str | None"]
@@ -103,18 +103,7 @@ def compare(item: SQLCompareItem, fetch: Fetcher | None = None) -> CompareReport
 def fetch_definition(server: ServerConfig, database: str, procedure: str) -> str | None:
     import pyodbc
 
-    host = f"{server.host},{server.port}" if server.port > 0 else server.host
-    parts = [
-        f"DRIVER={best_driver()}",
-        f"SERVER={host}",
-        f"DATABASE={database}",
-        "Encrypt=yes",
-    ]
-    if server.integrated_security:
-        parts.append("Trusted_Connection=yes")
-    else:
-        parts += [f"UID={server.username}", f"PWD={{{server.password.replace('}', '}}')}}}"]
-    conn = pyodbc.connect(";".join(parts), timeout=10)
+    conn = pyodbc.connect(build_connection_string(server.connection_string, database), timeout=10)
     try:
         cur = conn.cursor()
         cur.execute("SELECT OBJECT_DEFINITION(OBJECT_ID(?))", procedure)

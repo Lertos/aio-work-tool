@@ -7,20 +7,21 @@ from PySide6.QtWidgets import QFormLayout, QLineEdit, QTabWidget, QWidget
 
 from ...config import SPACING
 from ...model.items import SQLCompareItem
+from ...services.odbc import server_from
 from ..widgets import hline, lines, text_box
 from .item_form_dialog import ItemFormDialog, ValidationError
 
 
 class _RunServerPage(QWidget):
-    def __init__(self, host: str, databases: list[str]):
+    def __init__(self, server: str, databases: list[str]):
         super().__init__()
         form = QFormLayout(self)
         form.setHorizontalSpacing(SPACING)
         form.setVerticalSpacing(SPACING)
-        host_edit = QLineEdit(host)
-        host_edit.setReadOnly(True)
+        server_edit = QLineEdit(server)
+        server_edit.setReadOnly(True)
         self.databases = text_box("\n".join(databases), "Each line is a new database", rows=3)
-        form.addRow("Host", host_edit)
+        form.addRow("Server", server_edit)
         form.addRow("Databases", self.databases)
 
 
@@ -40,7 +41,7 @@ class SqlCompareRunDialog(ItemFormDialog):
         self.tabs.setMinimumSize(350, 200)
         self._pages: list[_RunServerPage] = []
         for server in item.servers:
-            page = _RunServerPage(server.host, server.databases)
+            page = _RunServerPage(server_from(server.connection_string), server.databases)
             self._pages.append(page)
             self.tabs.addTab(page, server.tab_name)
         self.body.insertWidget(1, hline())
