@@ -21,7 +21,8 @@ from typing import Protocol
 
 from .item_store import ItemStore
 from .items import (CopyItem, FolderItem, InfoItem, PromoteItem, SavedQuery, SchemaEnvironment,
-                    SQLCompareItem, SurroundItem, TodoItem, item_from_dict, item_to_dict)
+                    ScriptItem, SQLCompareItem, SurroundItem, TodoItem, item_from_dict,
+                    item_to_dict)
 
 SCHEMA_VERSION = 1
 KEYRING_SERVICE = "work-aio-tool"
@@ -36,6 +37,7 @@ LIST_FILES = {
     "surround": SurroundItem,
     "schema_backup": SchemaEnvironment,
     "queries": SavedQuery,
+    "scripts": ScriptItem,
 }
 
 # Lists whose items keep a connection_string in the OS keyring, and the key prefix for each.

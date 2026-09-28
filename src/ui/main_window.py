@@ -12,7 +12,7 @@ from ..model.storage import Storage
 from .tabs.promoter_tab import PromoterTab
 from .tabs.saved_query_tab import SavedQueryTab
 from .tabs.schema_backup_tab import SchemaBackupTab
-from .tabs.simple_tabs import CopyTab, FoldersTab, InfoTab
+from .tabs.simple_tabs import CopyTab, FoldersTab, InfoTab, ScriptsTab
 from .tabs.sql_compare_tab import SqlCompareTab
 from .tabs.surround_tab import SurroundTab
 from .tabs.todo_tab import TodoTab
@@ -37,12 +37,15 @@ class MainWindow(QMainWindow):
             SurroundTab(stores["surround"]),
             SchemaBackupTab(stores["schema_backup"]),
             SavedQueryTab(stores["queries"]),
+            ScriptsTab(stores["scripts"]),
         ]
         for i, page in enumerate(pages):
             self.tabs.addTab(page, page.TITLE)
-            self.tabs.setTabToolTip(i, f"Press {i + 1}")
-            shortcut = QShortcut(QKeySequence(str(i + 1)), self)  # number keys switch tabs
-            shortcut.activated.connect(partial(self.tabs.setCurrentIndex, i))
+            if i < 10:  # number keys switch tabs: 1-9, then 0 for the tenth
+                key = str((i + 1) % 10)
+                self.tabs.setTabToolTip(i, f"Press {key}")
+                shortcut = QShortcut(QKeySequence(key), self)
+                shortcut.activated.connect(partial(self.tabs.setCurrentIndex, i))
 
         # Window size/position and last tab are remembered between runs
         # (the Java version had this as a TODO).

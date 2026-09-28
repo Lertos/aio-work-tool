@@ -1,11 +1,12 @@
-"""Add/edit dialogs for the To-Do, Info, Copy and Folders tabs."""
+"""Add/edit dialogs for the To-Do, Info, Scripts, Copy and Folders tabs."""
 from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import QCheckBox, QFileDialog, QHBoxLayout, QLineEdit, QToolButton, QWidget
 
-from ...model.items import CopyItem, FolderItem, InfoItem, TodoItem
+from ...model.items import CopyItem, FolderItem, InfoItem, ScriptItem, TodoItem
 from ..widgets import text_box
 from .item_form_dialog import ItemFormDialog, ValidationError
 
@@ -15,17 +16,18 @@ def _titles(noun: str, item) -> tuple[str, str]:
 
 
 class _DescriptionDialog(ItemFormDialog):
-    """Display Text line + one multi-line field; shared by To-Do, Info and Copy."""
+    """Display Text line + one multi-line field; shared by To-Do, Info, Scripts and Copy."""
 
     NOUN = ""
     TEXT_LABEL = ""
     TEXT_REQUIRED = False
+    TEXT_ROWS = 4
 
     def __init__(self, parent, item=None):
         super().__init__(parent, *_titles(self.NOUN, item))
         self._item = item
         self.name = QLineEdit(item.description if item else "")
-        self.text = text_box(self._text_of(item) if item else "", rows=4)
+        self.text = text_box(self._text_of(item) if item else "", rows=self.TEXT_ROWS)
         self.form.addRow("Display Text", self.name)
         self.form.addRow(self.TEXT_LABEL, self.text)
         self.resize(420, self.sizeHint().height())
@@ -59,6 +61,30 @@ class InfoDialog(_DescriptionDialog):
 
     def build_result(self) -> InfoItem:
         return InfoItem(self.name.text().strip(), self.text.toPlainText().strip())
+
+
+class ScriptDialog(_DescriptionDialog):
+    NOUN, TEXT_LABEL, TEXT_REQUIRED, TEXT_ROWS = "Script", "PowerShell Commands", True, 10
+
+    def __init__(self, parent, item: ScriptItem | None = None):
+        super().__init__(parent, item)
+        self.text.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
+        self.text.setPlaceholderText("One command per line, like a batch file, e.g.\n"
+                                     "Set-Location C:\\Projects\\app\n"
+                                     "git pull\n"
+                                     "npm run build")
+        self.elevated = QCheckBox()
+        self.elevated.setChecked(bool(item and item.run_as_admin))
+        self.elevated.setToolTip("Run as administrator - Windows will ask for permission first")
+        self.form.addRow("Needs Elevated Access", self.elevated)
+        self.resize(560, self.sizeHint().height())
+
+    def _text_of(self, item: ScriptItem) -> str:
+        return item.commands
+
+    def build_result(self) -> ScriptItem:
+        return ScriptItem(self.name.text().strip(), self.text.toPlainText().strip(),
+                          self.elevated.isChecked())
 
 
 class CopyDialog(_DescriptionDialog):

@@ -8,11 +8,11 @@ cd aio-work-tool
 pip install -r requirements.txt
 python -m src
 ```
-Keys 1-9 switch tabs. Window size, position and last tab are remembered.
+Keys 1-9 and 0 switch tabs. Window size, position and last tab are remembered.
 
 ## Data
 Saved as JSON, one file per list, in `%APPDATA%\lertos\Work AIO Tool\`
-(`todo.json`, `folders.json`, `copy.json`, `promote.json`, `info.json`, `sql_compare.json`, `surround.json`, `schema_backup.json`, `queries.json`).
+(`todo.json`, `folders.json`, `copy.json`, `promote.json`, `info.json`, `sql_compare.json`, `surround.json`, `schema_backup.json`, `queries.json`, `scripts.json`).
 SQL passwords and the Schema Backup and Queries connection strings are stored in Windows Credential Manager
 (service `work-aio-tool`), not in the JSON.
 
@@ -29,9 +29,10 @@ src/
              item_list_model.py (Qt model), storage.py (JSON + keyring)
   services/  promoter.py (copy/move), sql_compare.py (definition compare), surround.py (prefix/suffix lines),
              odbc.py (SQL Server driver + connection strings),
-             schema_backup.py (save definitions to .sql files), saved_query.py (run a query)
+             schema_backup.py (save definitions to .sql files), saved_query.py (run a query),
+             powershell.py (run a saved script in a PowerShell window, optionally as admin)
   ui/        main_window.py, delegates.py (list rows), toast.py, worker.py, widgets.py
-    tabs/    item_list_tab.py (shared base), todo, simple (folders/copy/info), promoter, sql_compare, surround, schema_backup, saved_query
+    tabs/    item_list_tab.py (shared base), todo, simple (folders/copy/info/scripts), promoter, sql_compare, surround, schema_backup, saved_query
     dialogs/ item_form_dialog.py (shared base), simple, promote, sql_compare, sql_compare_run, surround, schema_backup(_run),
              saved_query, query_results
 ```

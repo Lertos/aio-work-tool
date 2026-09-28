@@ -1,4 +1,4 @@
-"""Folders, Copy and Info tabs - each is a few overrides on ItemListTab."""
+"""Folders, Copy, Info and Scripts tabs - each is a few overrides on ItemListTab."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +7,8 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import QMessageBox
 
-from ..dialogs.simple_dialogs import CopyDialog, FolderDialog, InfoDialog
+from ...services.powershell import ScriptError, run_script
+from ..dialogs.simple_dialogs import CopyDialog, FolderDialog, InfoDialog, ScriptDialog
 from ..toast import show_toast
 from .item_list_tab import ItemListTab
 
@@ -57,3 +58,23 @@ class InfoTab(ItemListTab):
 
     def on_row_clicked(self, row: int) -> None:
         self.on_edit(row)
+
+
+class ScriptsTab(ItemListTab):
+    TITLE = "Scripts"
+    HINT = "Click a script to run it in PowerShell"
+
+    def tooltip(self, item) -> str:
+        return ("Runs as administrator\n\n" if item.run_as_admin else "") + item.commands
+
+    def open_editor(self, item):
+        return ScriptDialog.ask(self, item)
+
+    def on_row_clicked(self, row: int) -> None:
+        try:
+            started = run_script(self.item(row))
+        except (ScriptError, OSError) as err:
+            QMessageBox.warning(self, self.TITLE, str(err))
+            return
+        if started:
+            show_toast(self, "Script started")

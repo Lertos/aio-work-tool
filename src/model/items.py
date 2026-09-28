@@ -54,6 +54,15 @@ class InfoItem:
 
 
 @dataclass
+class ScriptItem:
+    """PowerShell commands run in their own console window from the Scripts tab."""
+
+    description: str
+    commands: str = ""
+    run_as_admin: bool = False
+
+
+@dataclass
 class SurroundItem:
     prefix: str = ""
     suffix: str = ""
